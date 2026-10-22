@@ -39,10 +39,14 @@ func (a *Application) syncAccount(username string) error {
 			rules = append(rules, Rule{kind, topic, true, 1})
 		}
 	}
-	rules = append(rules, Rule{"publishClientSend", "homeassistant/+/" + userKey(username) + "/#", true, 1}, Rule{"subscribeLiteral", "homeassistant/status", true, 1}, Rule{"publishClientReceive", "homeassistant/status", true, 1})
+	// Permit the exact HA birth topic so integration reload can restore discovery.
+	rules = append(rules, Rule{"publishClientSend", "homeassistant/+/" + userKey(username) + "/#", true, 1}, Rule{"subscribeLiteral", "homeassistant/status", true, 1}, Rule{"publishClientReceive", "homeassistant/status", true, 1}, Rule{"publishClientSend", "homeassistant/status", true, 1})
 	_, err := a.broker.Command("getRole", map[string]interface{}{"rolename": role})
 	if notFound(err) {
 		_, err = a.broker.Command("createRole", map[string]interface{}{"rolename": role, "acls": rules})
+	} else if err == nil {
+		// Existing accounts must receive updated permissions as well.
+		_, err = a.broker.Command("modifyRole", map[string]interface{}{"rolename": role, "acls": rules})
 	}
 	if err != nil {
 		return err
